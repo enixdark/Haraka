@@ -7,6 +7,7 @@ var queueName;
 var connExchange_;
 var connQueue_;
 var routing_;
+var deliveryMode;
 exports.exchangeMapping = {}
 
 //This method registers the hook and try to initialize the connection to rabbitmq server for later use.
@@ -74,6 +75,7 @@ exports.init_rabbitmq_server = function() {
         durable = config.rabbitmq.durable === 'true'|| true;
         autoDelete = config.rabbitmq.autoDelete === 'true' || false;
         deliveryMode = config.rabbitmq.deliveryMode || 2;
+        routing_ = config.rabbitmq.routing || "#";
         queueName = config.rabbitmq.queueName || 'emails';
     }
     else {
@@ -110,6 +112,7 @@ exports.init_rabbitmq_server = function() {
 
     rabbitqueue.on('ready', function () {
         logger.logdebug("Connection is ready, will try making exchange");
+        plugin.register_hook('queue_outbound', 'hook_queue');
         // Now connection is ready will try to open exchange with config data.
         rabbitqueue.exchange(exchangeName, {  type: exchangeType,  confirm: confirm,  durable: durable }, function(connExchange) {
 
