@@ -22,12 +22,23 @@ exports.register = function () {
 exports.hook_queue = function(next, connection) {
     //Calling the get_data method and when it gets the data on callback, publish the message to queue with routing key.
     connection.transaction.message_stream.get_data(function(buffere) {
+        var reformatter = function(str){
+            var json_data = {};
+            var list_data = str.split("\r\n").filter(Boolean);
+            list_data.slice(0,list_data.length - 2).map(function (substr) {
+                var item = substr.split(": ");
+                json_data[item[0]] = item[1];
+            });
+            json_data['body'] = list_data[list_data.length - 1];
+            return json_data;
+        }
+
         var exchangeData = exports.exchangeMapping[exchangeName + queueName]
         logger.logdebug("Sending the data: "+ queueName+" Routing : "+ exchangeData + " exchange :"+connExchange_);
         if (connExchange_ && routing_) {
             //This is publish function of rabbitmq amqp library, currently direct queue is configured and routing is fixed.
             //Needs to be changed.
-            connExchange_.publish(routing_, buffere,{deliveryMode: 2}, function(error){
+            connExchange_.publish(routing_, reformatter(buffere), {deliveryMode: 2}, function(error){
                 if (error) {
                     //There was some error while sending the email to queue.
                     logger.logdebug("queueFailure: #{JSON.stringify(error)}");
