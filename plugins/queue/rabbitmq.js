@@ -24,10 +24,19 @@ exports.hook_queue = function(next, connection) {
     connection.transaction.message_stream.get_data(function(buffere) {
         var reformatter = function(str){
             var json_data = {};
-            var list_data = str.split("\r\n").filter(Boolean);
-            list_data.slice(0,list_data.length - 2).map(function (substr) {
+            json_data["header"] = {};
+            var list_data = str.replace(/\r\n\t/g,"").split("\r\n").filter(Boolean);
+            list_data.slice(0,list_data.length - 1).map(function (substr) {
                 var item = substr.split(": ");
-                json_data[item[0]] = item[1];
+                if(item[0].toLowerCase().indexOf("x-") != -1){
+                    json_data["header"][item[0]] = item[1];
+                }
+                else if(item[0].toLowerCase() === "to"){
+                    json_data["recipient"] = item[1];
+                }
+                else{
+                    json_data[item[0].toLowerCase()] = item[1];
+                }
             });
             json_data['body'] = list_data[list_data.length - 1];
             return json_data;
