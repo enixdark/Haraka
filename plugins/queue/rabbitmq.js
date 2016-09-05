@@ -1,6 +1,6 @@
 var amqp = require('amqp');
 var logger = require('./logger');
-
+var request = require('request');
 var rabbitqueue;
 var exchangeName;
 var queueName;
@@ -8,6 +8,7 @@ var connExchange_;
 var connQueue_;
 var routing_;
 var deliveryMode;
+var uri;
 exports.exchangeMapping = {}
 
 //This method registers the hook and try to initialize the connection to rabbitmq server for later use.
@@ -47,18 +48,29 @@ exports.hook_queue = function(next, connection) {
         if (connExchange_ && routing_) {
             //This is publish function of rabbitmq amqp library, currently direct queue is configured and routing is fixed.
             //Needs to be changed.
-            connExchange_.publish(routing_, reformatter(buffere), {deliveryMode: 2}, function(error){
-                if (error) {
-                    //There was some error while sending the email to queue.
-                    logger.logdebug("queueFailure: #{JSON.stringify(error)}");
-                    exports.init_rabbitmq_server();
-                    return next();
-                }
-                else {
-                    //Queueing was successful, send ok as reply
-                    logger.logdebug( "queueSuccess");
-                    return next(OK,"Successfully Queued! in rabbitmq");
-                }
+            var message = {"email": reformatter(buffere)};
+            request({
+                url: uri,
+                method: "POST",
+                headers: {
+                    "content-type": "application/json",
+                },
+                body: message
+            }, function (err, resp, body) {
+                if(err || resp.statusCode == 400 ) throw err;
+                connExchange_.publish(routing_, JSON.parse(body)['email'], {deliveryMode: 2}, function(error){
+                    if (error) {
+                        //There was some error while sending the email to queue.
+                        logger.logdebug("queueFailure: #{JSON.stringify(error)}");
+                        exports.init_rabbitmq_server();
+                        return next();
+                    }
+                    else {
+                        //Queueing was successful, send ok as reply
+                        logger.logdebug( "queueSuccess");
+                        return next(OK,"Successfully Queued! in rabbitmq");
+                    }
+                });
             });
         }
         else {
@@ -97,6 +109,7 @@ exports.init_rabbitmq_server = function() {
         deliveryMode = config.rabbitmq.deliveryMode || 2;
         routing_ = config.rabbitmq.routing || "#";
         queueName = config.rabbitmq.queueName || 'emails';
+        uri = config.rabbitmq.m_worker || 'localhost:9299/emails/validate';
     }
     else {
         //If config file is not available , lets get the default values
