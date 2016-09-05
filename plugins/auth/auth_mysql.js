@@ -7,8 +7,7 @@
 var mysql  = require('mysql');
 var async = require('async');
 var crypto = require('crypto');
-var utils = require('./utils');
-
+var util = require('util');
 exports.hook_capabilities = function (next, connection) {
   connection.loginfo('connected as id 1');
   // if (connection.using_tls) {
@@ -62,8 +61,8 @@ exports.check_plain_passwd = function (connection, user, passwd, cb) {
             }
             return cb(false);
         };
-        client.query("select encrypted_password from " + tablename + " where  email='" + user +"' limit 1;",
-            function (err, rows){
+        var query = util.format("select encrypted_password from %s where  email='%s' limit 1;", tablename, user);
+        client.query(query, function (err, rows){
                 if(err){
                     connection.loginfo("auth_mysql: " + err.message);
                     return cb(false);
