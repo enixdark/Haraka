@@ -67,11 +67,12 @@ exports.check_plain_passwd = function (connection, user, passwd, cb) {
                     connection.loginfo("auth_mysql: " + err.message);
                     return cb(false);
                 }
-                else if(rows.lenght === 0){
-                    connection.loginfo("no data for email: " + user);
+                else if(Array.isArray(rows) && rows.length){
+                    return md5_password(passwd,rows[0].encrypted_password);
                 }
                 else{
-                    return md5_password(passwd,rows[0].encrypted_password);
+                    connection.loginfo("no data for email: " + user);
+                    return cb(false);
                 }
             });
     });

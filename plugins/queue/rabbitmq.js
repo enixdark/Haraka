@@ -1,6 +1,7 @@
 var amqp = require('amqp');
 var logger = require('./logger');
 var request = require('request');
+var url = require('url');
 var rabbitqueue;
 var exchangeName;
 var queueName;
@@ -55,7 +56,7 @@ exports.hook_queue = function(next, connection) {
                 headers: {
                     "content-type": "application/json",
                 },
-                body: message
+                body: JSON.stringify(message)
             }, function (err, resp, body) {
                 if(err || resp.statusCode == 400 ) throw err;
                 connExchange_.publish(routing_, JSON.parse(body)['email'], {deliveryMode: 2}, function(error){
@@ -109,7 +110,8 @@ exports.init_rabbitmq_server = function() {
         deliveryMode = config.rabbitmq.deliveryMode || 2;
         routing_ = config.rabbitmq.routing || "#";
         queueName = config.rabbitmq.queueName || 'emails';
-        uri = config.rabbitmq.m_worker || 'localhost:9299/emails/validate';
+        uri = (config.rabbitmq.m_worker_tls == true ? "https://" : "http://") +
+              (config.rabbitmq.m_worker_connection || 'localhost:9299/emails/validate');
     }
     else {
         //If config file is not available , lets get the default values
