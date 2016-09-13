@@ -120,9 +120,38 @@ Install Haraka's node.js dependencies locally:
 Edit `config/plugins` and `config/smtp.ini` to specify the plugins and
 config you want.
 
+note: in this modify version, there're two update for plugins:
++ rabbitmq: Rabbitmq to queue message from smtp-server,then send to m-worker
++ auth_mysql: Mysql auth to check account for service.
+
 Finally run Haraka:
 
     $ node haraka.js
+
+
+### Docker
+- this version's updated to use with modify source code, so need to pass some envs:
+
++ MYSQL_HOST: mysql hostname
++ MYSQL_PORT=: mysql port
++ MYSQL_DATABASE: database'll use to auth service
++ MYSQL_TABLE: table'll use to query auth
++ MYSQL_USERNAME:mysql username , default: root
++ MYSQL_PASSWORD: mysql password, default:
++ REJECTUNAUTHORIZED: default false
++ RABBITMQ_HOST: rabbitmq host
++ RABBITMQ_PORT: rabbitmq port
++ RABBITMQ_EXCHANGE: exchange name to sender
++ RABBITMQ_USERNAME: rabbitmq username
++ RABBITMQ_PASSWORD: rabbitmq password
++ RABBITMQ_QUEUE: rabbitmq queue 
++ RABBITMQ_DELIVERY_MODE: default 2
++ RABBITMQ_DURABLE: default true
++ RABBITMQ_AUTO_DELETE: default false
++ RABBITMQ_EXCHANGE_TYPE: default direct
++ RABBITMQ_ROUTING:
++ M_WORKER_TLS: 'll to extract protocal for validator serice ,default false -> http, true -> https
++ M_WORKER_CONNECT_URI: uri to connect mail validator
 
 ### License and Author
 

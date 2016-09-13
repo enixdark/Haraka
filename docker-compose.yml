@@ -1,0 +1,13 @@
+version: '2'
+services:
+  haraka:
+    build: .
+    command: ./start.sh
+    ports:
+      - "25:25"
+      - "587:587"
+    env_file: .env
+    # links:
+    #   - rabbitmq
+    #   - mysql
+  
