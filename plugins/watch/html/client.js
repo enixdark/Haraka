@@ -41,7 +41,7 @@ function newRowConnectRow1 (data, uuid, txnId) {
     return [
         '<tr class="spacer"><td colspan="'+total_cols+'"></td></tr>',
         '<tr class="'+uuid+'">',
-        '<td class="uuid uuid_tiny got" rowspan=2 title='+data.uuid+'>'+ data.uuid+'</td>',
+        '<td class="uuid uuid_tiny got" rowspan=2 title='+data.uuid+'><a href="/logs/'+data.uuid+'">'+ data.uuid+'</a></td>',
         '<td class="remote_host got" colspan=' + (connect_cols - 1) +' title="'+ host.title+'">'+host.newval+'</td>',
         '<td class="local_port bg_dgreen" title="connected">'+port+'</td>',
         '<td class="helo lgrey" colspan="' + helo_cols + '"></td>',
@@ -201,7 +201,7 @@ function ws_connect() {
     };
 
     var last_insert = 0;
-    var sampled_out = 0;
+    // var sampled_out = 0;
 
     ws.onmessage = function(event, flags) {
         // flags.binary will be set if a binary data is received
@@ -236,7 +236,7 @@ function ws_connect() {
         if (config.sampling) {
             now = new Date().getTime();
             if ((now - last_insert) < 1000) {
-                sampled_out++;
+                // sampled_out++;
                 // $('#messages').append("so:" + sampled_out);
                 return;
             }

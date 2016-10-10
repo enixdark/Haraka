@@ -2,7 +2,7 @@ var amqp = require('amqp');
 var logger = require('./logger');
 var request = require('request');
 var url = require('url');
-var extend = require('util')._extend
+var extend = require('util')._extend;
 var rabbitqueue;
 var exchangeName;
 var queueName;
@@ -79,7 +79,7 @@ exports.hook_queue = function(next, connection) {
                         logger.logdebug("queueFailure: #{JSON.stringify(error)}");
                     })
                 }
-                connExchange_.publish(routing_, data, {deliveryMode: 2}, function(error){
+                connExchange_.publish(routing_, data, {deliveryMode: deliveryMode}, function(error){
                     if (error) {
                         //There was some error while sending the email to queue.
                         logger.logdebug("queueFailure: #{JSON.stringify(error)}");

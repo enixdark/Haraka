@@ -5,7 +5,7 @@ var http = require('http');
 
 // haraka libs
 var DSN = require('./dsn');
-var net_utils = require('./net_utils');
+var net_utils = require('haraka-net-utils');
 
 exports.register = function () {
     this.load_rspamd_ini();
@@ -68,19 +68,19 @@ exports.get_options = function (connection) {
         options.headers.User = connection.notes.auth_user;
     }
 
-    if (connection.remote_ip) options.headers.IP = connection.remote_ip;
+    if (connection.remote.ip) options.headers.IP = connection.remote.ip;
 
     var fcrdns = connection.results.get('connect.fcrdns');
     if (fcrdns && fcrdns.fcrdns && fcrdns.fcrdns[0]) {
         options.headers.Hostname = fcrdns.fcrdns[0];
     }
     else {
-        if (connection.remote_host) {
-            options.headers.Hostname = connection.remote_host;
+        if (connection.remote.host) {
+            options.headers.Hostname = connection.remote.host;
         }
     }
 
-    if (connection.hello_host) options.headers.Helo = connection.hello_host;
+    if (connection.hello.host) options.headers.Helo = connection.hello.host;
 
     if (connection.transaction.mail_from) {
         var mfaddr = connection.transaction.mail_from.address().toString();
@@ -117,12 +117,12 @@ exports.hook_data_post = function (next, connection) {
     var authed = connection.notes.auth_user;
     if (authed && !cfg.check.authenticated) return next();
     if (!cfg.check.private_ip &&
-        net_utils.is_private_ip(connection.remote_ip)) {
+        net_utils.is_private_ip(connection.remote.ip)) {
         return next();
     }
 
     var timer;
-    var timeout = plugin.cfg.timeout || plugin.timeout - 1;
+    var timeout = plugin.cfg.main.timeout || plugin.timeout - 1;
 
     var calledNext=false;
     var callNext = function (code, msg) {
@@ -265,22 +265,18 @@ exports.add_headers = function (connection, data) {
 
     if (cfg.header && cfg.header.bar) {
         var spamBar = '';
-        var spamBarScore = data.score;
-        if (data.score === 0) {
-            spamBar = cfg.spambar.neutral || '/';
+        var spamBarScore = 1;
+        var spamBarChar = cfg.spambar.neutral || '/';
+        if (data.score >= 1) {
+            spamBarScore = data.score;
+            spamBarChar = cfg.spambar.positive || '+';
         }
-        else {
-            var spamBarChar;
-            if (data.score > 0) {
-                spamBarChar = cfg.spambar.positive || '+';
-            }
-            else {
-                spamBarScore = spamBarScore * -1;
-                spamBarChar = cfg.spambar.negative || '-';
-            }
-            for (var i = 0; i < data.score; i++) {
-                spamBar += spamBarChar;
-            }
+        else if (data.score <= -1) {
+            spamBarScore = data.score * -1;
+            spamBarChar = cfg.spambar.negative || '-';
+        }
+        for (var i = 0; i < spamBarScore; i++) {
+            spamBar += spamBarChar;
         }
         connection.transaction.remove_header(cfg.header.bar);
         connection.transaction.add_header(cfg.header.bar, spamBar);

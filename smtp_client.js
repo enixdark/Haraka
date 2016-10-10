@@ -383,7 +383,7 @@ exports.get_client_plugin = function (plugin, connection, c, callback) {
 
         var helo = function (command) {
             if (smtp_client.xclient) {
-                smtp_client.send_command(command, connection.hello_host);
+                smtp_client.send_command(command, connection.hello.host);
             }
             else {
                 smtp_client.send_command(command, plugin.config.get('me'));
@@ -400,7 +400,7 @@ exports.get_client_plugin = function (plugin, connection, c, callback) {
             for (var line in smtp_client.response) {
                 if (smtp_client.response[line].match(/^XCLIENT/)) {
                     if (!smtp_client.xclient) {
-                        smtp_client.send_command('XCLIENT', 'ADDR=' + connection.remote_ip);
+                        smtp_client.send_command('XCLIENT', 'ADDR=' + connection.remote.ip);
                         return;
                     }
                 }
@@ -485,7 +485,7 @@ exports.get_client_plugin = function (plugin, connection, c, callback) {
 
         if (smtp_client.connected) {
             if (smtp_client.xclient) {
-                smtp_client.send_command('XCLIENT', 'ADDR=' + connection.remote_ip);
+                smtp_client.send_command('XCLIENT', 'ADDR=' + connection.remote.ip);
             }
             else {
                 smtp_client.emit('helo');
@@ -523,8 +523,8 @@ function get_hostport (connection, server_notes, config_arg) {
     }
     else {
         // current behavior in get_pool is to default to localhost:25
-        logger.logwarn("[smtp_client_pool] neither forwarding_host_pool nor host, port" +
-                       "found in config file, defaulting to localhost:25");
-        return { host: 'localhost', port: 25 };
+        logger.logwarn("[smtp_client_pool] forwarding_host_pool or host and port " +
+                "were not found in config file");
+        throw new Error("You must specify either forwarding_host_pool or host and port");
     }
 }

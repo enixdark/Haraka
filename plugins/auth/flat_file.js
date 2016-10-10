@@ -1,5 +1,5 @@
 // Auth against a flat file
-var net_utils = require('./net_utils');
+var net_utils = require('haraka-net-utils');
 
 exports.register = function () {
     var plugin = this;
@@ -17,7 +17,7 @@ exports.load_flat_ini = function () {
 exports.hook_capabilities = function (next, connection) {
     var plugin = this;
     // don't allow AUTH unless private IP or encrypted
-    if (!net_utils.is_private_ip(connection.remote_ip) && !connection.using_tls) {
+    if (!net_utils.is_private_ip(connection.remote.ip) && !connection.tls.enabled) {
         connection.logdebug(plugin,
                 "Auth disabled for insecure public connection");
         return next();

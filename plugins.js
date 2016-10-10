@@ -77,14 +77,16 @@ Plugin.prototype._get_plugin_path = function () {
         paths.push(
             path.resolve(process.env.HARAKA, 'plugins', name + '.js'),
             path.resolve(process.env.HARAKA, 'plugins', name, 'package.json'),
-            path.resolve(process.env.HARAKA, 'node_modules', name, 'package.json')
+            path.resolve(process.env.HARAKA, 'node_modules', name, 'package.json'),
+            path.resolve(process.env.HARAKA, 'node_modules', 'haraka-plugin-' + name, 'package.json')
         );
     }
 
     paths.push(
         path.resolve(__dirname, 'plugins', name + '.js'),
         path.resolve(__dirname, 'plugins', name, 'package.json'),
-        path.resolve(__dirname, 'node_modules', name, 'package.json')
+        path.resolve(__dirname, 'node_modules', name, 'package.json'),
+        path.resolve(__dirname, 'node_modules', 'haraka-plugin-' + name, 'package.json')
     );
 
     paths.forEach(function (pp) {
@@ -549,13 +551,13 @@ function get_denyfn (object, hook, params, retval, msg, respond_method) {
                     plugins.run_next_hook(hook, object, params);
                 }
                 else {
-                    object[respond_method](constants.cont, deny_msg);
+                    object[respond_method](constants.cont, deny_msg, params);
                 }
                 break;
             default:
                 object.saved_hooks_to_run = [];
                 object.hooks_to_run = [];
-                object[respond_method](retval, msg);
+                object[respond_method](retval, msg, params);
         }
     };
 }

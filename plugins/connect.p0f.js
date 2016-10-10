@@ -196,7 +196,7 @@ exports.hook_lookup_rdns = function onLookup(next, connection) {
         return next();
     }
     var p0f_client = server.notes.p0f_client;
-    p0f_client.query(connection.remote_ip, function (err, result) {
+    p0f_client.query(connection.remote.ip, function (err, result) {
         if (err) {
             connection.results.add(plugin, {err: err.message});
             return next();
@@ -233,7 +233,7 @@ exports.hook_data_post = function (next, connection) {
 
     connection.transaction.remove_header(header_name);
     var result = connection.results.get('connect.p0f');
-    if (!result || !result.os) {
+    if (!result || !result.os_name) {
         connection.results.add(plugin, {err: 'no p0f note'});
         return next();
     }

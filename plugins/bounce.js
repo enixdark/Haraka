@@ -1,7 +1,7 @@
 // bounce tests
 var tlds = require('haraka-tld');
 
-var net_utils = require('./net_utils');
+var net_utils = require('haraka-net-utils');
 var SPF = require('./spf').SPF;
 
 // Override logging in SPF module
@@ -110,7 +110,7 @@ exports.single_recipient = function(next, connection) {
                 {skip: 'single_recipient(relay)', emit: true });
         return next();
     }
-    if (net_utils.is_private_ip(connection.remote_ip)) {
+    if (net_utils.is_private_ip(connection.remote.ip)) {
         transaction.results.add(plugin,
                 {skip: 'single_recipient(private_ip)', emit: true });
         return next();

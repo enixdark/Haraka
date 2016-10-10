@@ -3,13 +3,8 @@
   "name": "Haraka",
   "license": "MIT",
   "description": "An SMTP Server project.",
-  "keywords": [
-    "haraka",
-    "smtp",
-    "server",
-    "email"
-  ],
-  "version": "2.8.8",
+  "keywords": [ "haraka", "smtp", "server", "email" ],
+  "version": "2.8.9",
   "homepage": "http://haraka.github.io",
   "repository": {
     "type": "git",
@@ -17,14 +12,13 @@
   },
   "main": "haraka.js",
   "engines": {
-    "node": ">= v0.10.44"
+    "node": ">= v0.12.16"
   },
   "dependencies": {
     "address-rfc2821": "*",
     "address-rfc2822": "*",
     "amqp": "^0.2.6",
     "amqplib": "^0.4.2",
-    "async": "~1.5.2",
     "daemon": "~1.1.0",
     "generic-pool": "~2.4.1",
     "haraka-constants": "*",
@@ -39,7 +33,12 @@
     "request": "^2.74.0",
     "semver": "~5.0.3",
     "sequelize": "^3.24.3",
-    "sprintf-js": "~1.0.3"
+    "sprintf-js": "~1.0.3",
+    "async"                 : "~2.0.0",
+    "semver"                : "~5.0.3",
+    "haraka-tld"            : "*",
+    "haraka-constants"      : "*",
+    "haraka-net-utils"      : "*"
   },
   "optionalDependencies": {
     "elasticsearch": "*",
@@ -72,6 +71,8 @@
     "haraka_grep": "./bin/haraka_grep"
   },
   "scripts": {
-    "test": "node run_tests"
+    "test": "node run_tests",
+    "lint": "grunt lint",
+    "coverage": "NODE_ENV=cov ./node_modules/.bin/istanbul cov run_tests"
   }
 }

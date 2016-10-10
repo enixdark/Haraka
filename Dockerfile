@@ -21,11 +21,12 @@ ENV HOME /root
 RUN /etc/my_init.d/00_regen_ssh_host_keys.sh
 
 RUN sed 's/main$/main universe/' -i /etc/apt/sources.list
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y update
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y install python-software-properties g++ make git curl
-RUN curl -sL https://deb.nodesource.com/setup_6.x | bash -
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y install nodejs && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y -q update
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y -q install python-software-properties g++ make git curl
+RUN curl -sL https://deb.nodesource.com/setup_5.x | setuser root bash -
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y -q install nodejs && \
+apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Optional, useful for development
 # See https://github.com/phusion/baseimage-docker#login_ssh

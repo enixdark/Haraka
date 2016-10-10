@@ -6,7 +6,7 @@ var dns       = require('dns');
 var net       = require('net');
 var tlds      = require('haraka-tld');
 
-var net_utils = require('./net_utils');
+var net_utils = require('haraka-net-utils');
 var utils     = require('./utils');
 
 // Default regexps to extract the URIs from the message
@@ -282,7 +282,7 @@ exports.do_lookups = function (connection, next, hosts, type) {
 exports.hook_lookup_rdns = function (next, connection) {
     this.load_uri_config(next);
     var plugin = this;
-    dns.reverse(connection.remote_ip, function (err, rdns) {
+    dns.reverse(connection.remote.ip, function (err, rdns) {
         if (err) {
             if (err.code) {
                 if (err.code === dns.NXDOMAIN) return next();

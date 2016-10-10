@@ -38,6 +38,9 @@ var my_hostname = require('os').hostname().replace(/\\/, '\\057').replace(/:/, '
 // File Name Format: $time_$attempts_$pid_$uniq.$host
 var fn_re = /^(\d+)_(\d+)_(\d+)(_\d+\..*)$/
 
+// Line regexp
+var line_regexp = utils.line_regexp;
+
 // TODO: For testability, this should be accessible
 var queue_dir = path.resolve(config.get('queue_dir') || (process.env.HARAKA + '/queue'));
 
@@ -67,13 +70,16 @@ exports.load_config = function () {
         cfg.maxTempFailures = config.get('outbound.maxTempFailures') || 13;
     }
     if (!cfg.concurrency_max) {
-        cfg.concurrency_max = config.get('outbound.concurrency_max') || 100;
+        cfg.concurrency_max = config.get('outbound.concurrency_max') || 10000;
     }
     if (!cfg.connect_timeout) {
         cfg.connect_timeout = 30;
     }
     if (cfg.pool_timeout === undefined) {
         cfg.pool_timeout = 50;
+    }
+    if (!cfg.pool_concurrency_max) {
+        cfg.pool_concurrency_max = 10;
     }
     if (!cfg.ipv6_enabled && config.get('outbound.ipv6_enabled')) {
         cfg.ipv6_enabled = true;
@@ -497,25 +503,64 @@ exports.send_email = function () {
 
     transaction.rcpt_to = to;
 
-
     // Set data_lines to lines in contents
-    var match;
-    var re = /^([^\n]*\n?)/;
-    while (match = re.exec(contents)) {
-        var line = match[1];
-        line = line.replace(/\r?\n?$/, '\r\n'); // make sure it ends in \r\n
-        if (dot_stuffed === false && line.length >= 3 && line.substr(0,1) === '.') {
-            line = "." + line;
-        }
-        transaction.add_data(new Buffer(line));
-        contents = contents.substr(match[1].length);
-        if (contents.length === 0) {
-            break;
+    if (typeof contents == 'string') {
+        var match;
+        while (match = line_regexp.exec(contents)) {
+            var line = match[1];
+            line = line.replace(/\r?\n?$/, '\r\n'); // make sure it ends in \r\n
+            if (dot_stuffed === false && line.length >= 3 && line.substr(0,1) === '.') {
+                line = "." + line;
+            }
+            transaction.add_data(new Buffer(line));
+            contents = contents.substr(match[1].length);
+            if (contents.length === 0) {
+                break;
+            }
         }
     }
+    else {
+        // Assume a stream
+        return stream_line_reader(contents, transaction, function (err) {
+            if (err) {
+                return next(constants.denysoft, "Error from stream line reader: " + err);
+            }
+            exports.send_trans_email(transaction, next);
+        });
+    }
+
     transaction.message_stream.add_line_end();
     this.send_trans_email(transaction, next);
 };
+
+function stream_line_reader (stream, transaction, cb) {
+    var current_data = '';
+    function process_data (data) {
+        current_data += data.toString();
+        var results;
+        while (results = line_regexp.exec(current_data)) {
+            var this_line = results[1];
+            current_data = current_data.slice(this_line.length);
+            if (!(current_data.length || this_line.length)) {
+                return;
+            }
+            transaction.add_data(new Buffer(this_line));
+        }
+    };
+
+    function process_end () {
+        if (current_data.length) {
+            transaction.add_data(new Buffer(current_data));
+        }
+        current_data = '';
+        transaction.message_stream.add_line_end();
+        cb();
+    };
+
+    stream.on('data', process_data);
+    stream.once('end', process_end);
+    stream.once('error', cb);
+}
 
 exports.send_trans_email = function (transaction, next) {
     var self = this;
@@ -537,7 +582,7 @@ exports.send_trans_email = function (transaction, next) {
     };
 
     logger.add_log_methods(connection);
-    transaction.results = new ResultStore(connection);
+    transaction.results = transaction.results || new ResultStore(connection);
 
     connection.pre_send_trans_email_respond = function (retval) {
         var deliveries = [];
@@ -1149,6 +1194,9 @@ function get_pool (port, host, local_addr, is_unix_socket, connect_timeout, pool
                     callback("Outbound connection timed out to " + host + ":" + port, null);
                 });
             },
+            validate: function(socket) {
+                return socket.writable;
+            },
             destroy: function(socket) {
                 logger.logdebug('[outbound] destroying pool entry for ' + host + ':' + port);
                 // Remove pool object from server notes once empty
@@ -1161,7 +1209,8 @@ function get_pool (port, host, local_addr, is_unix_socket, connect_timeout, pool
                     logger.logwarn("[outbound] Socket got an error while shutting down: " + err);
                 });
                 if (!socket.writable) return;
-                socket.send_command('QUIT');
+                logger.logprotocol("C: QUIT");
+                socket.write("QUIT\r\n");
                 socket.end(); // half close
                 socket.once('line', function (line) {
                     // Just assume this is a valid response
@@ -1169,7 +1218,7 @@ function get_pool (port, host, local_addr, is_unix_socket, connect_timeout, pool
                     socket.destroy();
                 });
             },
-            max: max || 1000,
+            max: max || 10,
             idleTimeoutMillis: pool_timeout * 1000,
             log: function (str, level) {
                 if (/this._availableObjects.length=/.test(str)) return;
@@ -1184,12 +1233,26 @@ function get_pool (port, host, local_addr, is_unix_socket, connect_timeout, pool
 
 // Get a socket for the given attributes.
 function get_client (port, host, local_addr, is_unix_socket, callback) {
-    var pool = get_pool(port, host, local_addr, is_unix_socket, cfg.connect_timeout, cfg.pool_timeout, cfg.concurrency_max);
-    pool.acquire(callback);
+    var pool = get_pool(port, host, local_addr, is_unix_socket, cfg.connect_timeout, cfg.pool_timeout, cfg.pool_concurrency_max);
+    if (pool.waitingClientsCount() >= cfg.pool_concurrency_max) {
+        return callback("Too many waiting clients for pool", null);
+    }
+    pool.acquire(function (err, socket) {
+        if (err) return callback(err);
+        socket.__acquired = true;
+        callback(null, socket);
+    });
 };
 
-function release_client (socket, port, host, local_addr) {
+function release_client (socket, port, host, local_addr, error) {
     logger.logdebug("[outbound] release_client: " + host + ":" + port + " to " + local_addr);
+
+    if (!socket.__acquired) {
+        logger.logerror("Release an un-acquired socket. Stack: " + (new Error()).stack);
+        return;
+    }
+    socket.__acquired = false;
+
     var pool_timeout = cfg.pool_timeout;
     var name = 'outbound::' + port + ':' + host + ':' + local_addr + ':' + pool_timeout;
     if (!(server.notes && server.notes.pool)) {
@@ -1200,6 +1263,10 @@ function release_client (socket, port, host, local_addr) {
     if (!pool) {
         logger.logcrit("[outbound] Releasing a pool (" + name + ") that doesn't exist!");
         return;
+    }
+
+    if (error) {
+        return sockend();
     }
 
     if (cfg.pool_timeout == 0) {
@@ -1228,11 +1295,11 @@ function release_client (socket, port, host, local_addr) {
     pool.release(socket);
 
     function sockend () {
+        if (server.notes.pool[name]) {
+            server.notes.pool[name].destroy(socket);
+        }
         socket.removeAllListeners();
         socket.destroy();
-        if (server.notes.pool[name]) {
-            server.notes.pool[name].destroyAllNow();
-        }
     }
 }
 
@@ -1291,7 +1358,7 @@ HMailItem.prototype.try_deliver_host_on_socket = function (mx, host, port, socke
         if (processing_mail) {
             self.logerror("Ongoing connection failed to " + host + ":" + port + " : " + err);
             processing_mail = false;
-            release_client(socket, port, host, mx.bind);
+            release_client(socket, port, host, mx.bind, true);
             // try the next MX
             return self.try_deliver_host(mx);
         }
@@ -1299,8 +1366,9 @@ HMailItem.prototype.try_deliver_host_on_socket = function (mx, host, port, socke
 
     socket.once('close', function () {
         if (processing_mail) {
+            self.logerror("Remote end " + host + ":" + port + " closed connection while we were processing mail. Trying next MX.");
             processing_mail = false;
-            release_client(socket, port, host, mx.bind);
+            release_client(socket, port, host, mx.bind, true);
             return self.try_deliver_host(mx);
         }
     });
@@ -1334,7 +1402,7 @@ HMailItem.prototype.try_deliver_host_on_socket = function (mx, host, port, socke
             self.logerror("Socket writability went away");
             if (processing_mail) {
                 processing_mail = false;
-                release_client(socket, port, host, mx.bind);
+                release_client(socket, port, host, mx.bind, true);
                 return self.try_deliver_host(mx);
             }
             return;
@@ -1450,7 +1518,12 @@ HMailItem.prototype.try_deliver_host_on_socket = function (mx, host, port, socke
         return send_command('MAIL', 'FROM:' + self.todo.mail_from);
     };
 
+    var fp_called = false;
     var finish_processing_mail = function (success) {
+        if (fp_called) {
+            return self.logerror("finish_processing_mail called multiple times! Stack: " + (new Error()).stack);
+        }
+        fp_called = true;
         if (fail_recips.length) {
             self.refcount++;
             exports.split_to_new_recipients(self, fail_recips, "Some recipients temporarily failed", function (hmail) {
@@ -1763,7 +1836,6 @@ HMailItem.prototype.populate_bounce_message = function (from, to, reason, cb) {
     var original_header_lines = [];
     var headers_done = false;
     var header = new Header();
-    var line_regexp = /^([^\n]*\n)/;
 
     try {
         var data_stream = this.data_stream();
