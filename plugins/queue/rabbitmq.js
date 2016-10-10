@@ -2,6 +2,7 @@ var amqp = require('amqp');
 var logger = require('./logger');
 var request = require('request');
 var url = require('url');
+var extend = require('util')._extend
 var rabbitqueue;
 var exchangeName;
 var queueName;
@@ -10,46 +11,54 @@ var connQueue_;
 var routing_;
 var deliveryMode;
 var uri;
+var email = require('./../models/mysql/email');
+var Email = undefined;
 exports.exchangeMapping = {}
 
 //This method registers the hook and try to initialize the connection to rabbitmq server for later use.
 exports.register = function () {
     logger.logdebug("About to connect and initialize queue object");
     this.init_rabbitmq_server();
+    this.init_mysql_server();
     logger.logdebug("Finished initiating : " + exports.exchangeMapping[exchangeName + queueName]);
 };
 
+exports.reformatter = function(str){
+    var json_data = {};
+    json_data["header"] = {};
+    var list_data = str.replace(/\r\n\t/g,"").split("\r\n").filter(Boolean);
+    list_data.slice(0,list_data.length - 1).map(function (substr) {
+        var item = substr.split(": ");
+        if(item[0].toLowerCase().indexOf("x-") != -1){
+            json_data["header"][item[0]] = item[1];
+        }
+        else if(item[0].toLowerCase() === "to"){
+            json_data["recipient"] = item[1];
+        }
+        else{
+            json_data[item[0].toLowerCase()] = item[1];
+        }
+    });
+    json_data['body'] = list_data[list_data.length - 1];
+    return json_data;
+}
+
+exports.sent_to_mysql = function () {
+    
+}
 
 //Actual magic of publishing message to rabbit when email comes happen here.
 exports.hook_queue = function(next, connection) {
     //Calling the get_data method and when it gets the data on callback, publish the message to queue with routing key.
     connection.transaction.message_stream.get_data(function(buffere) {
-        var reformatter = function(str){
-            var json_data = {};
-            json_data["header"] = {};
-            var list_data = str.replace(/\r\n\t/g,"").split("\r\n").filter(Boolean);
-            list_data.slice(0,list_data.length - 1).map(function (substr) {
-                var item = substr.split(": ");
-                if(item[0].toLowerCase().indexOf("x-") != -1){
-                    json_data["header"][item[0]] = item[1];
-                }
-                else if(item[0].toLowerCase() === "to"){
-                    json_data["recipient"] = item[1];
-                }
-                else{
-                    json_data[item[0].toLowerCase()] = item[1];
-                }
-            });
-            json_data['body'] = list_data[list_data.length - 1];
-            return json_data;
-        }
+        
 
         var exchangeData = exports.exchangeMapping[exchangeName + queueName]
         logger.logdebug("Sending the data: "+ queueName+" Routing : "+ exchangeData + " exchange :"+connExchange_);
         if (connExchange_ && routing_) {
             //This is publish function of rabbitmq amqp library, currently direct queue is configured and routing is fixed.
             //Needs to be changed.
-            var message = {"email": reformatter(buffere)};
+            var message = {"email": exports.reformatter(buffere)};
             request({
                 url: uri,
                 method: "POST",
@@ -59,7 +68,18 @@ exports.hook_queue = function(next, connection) {
                 body: JSON.stringify(message)
             }, function (err, resp, body) {
                 if(err || resp.statusCode == 400 ) throw err;
-                connExchange_.publish(routing_, JSON.parse(body)['email'], {deliveryMode: 2}, function(error){
+                var data = JSON.parse(body)['email'];
+                if(Email && data["header"]["X-MailShip-ID"]){
+                    var clone_data = extend({},data);
+                    clone_data["account_id"] = data["header"]["X-MailShip-ID"]
+                    clone_data["header"] = JSON.stringify(clone_data["header"])
+                    Email.create(extend(clone_data, { "status": "email"})).then(function (response) {
+                        logger.logdebug("create susscess data to email-service ");
+                    }, function (err) {
+                        logger.logdebug("queueFailure: #{JSON.stringify(error)}");
+                    })
+                }
+                connExchange_.publish(routing_, data, {deliveryMode: 2}, function(error){
                     if (error) {
                         //There was some error while sending the email to queue.
                         logger.logdebug("queueFailure: #{JSON.stringify(error)}");
@@ -81,6 +101,16 @@ exports.hook_queue = function(next, connection) {
         }
     });
 };
+
+exports.init_mysql_server = function () {
+    var plugin = this;
+
+    var config = plugin.config.get('auth_mysql.ini');
+    if(config.core){
+        Email = email.init(config.core.host, config.core.port, config.core.username, config.core.password,
+            config.core.email_database, config.core.email_tablename)
+    };
+}
 
 //This initializes the connection to rabbitmq server, It reads values from rabbitmq.ini file in config directory.
 exports.init_rabbitmq_server = function() {

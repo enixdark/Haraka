@@ -28,7 +28,7 @@ var ResultStore = require('./result_store');
 var hostname    = (os.hostname().split(/\./))[0];
 var version     = JSON.parse(
         fs.readFileSync(path.join(__dirname, 'package.json'))).version;
-
+var sentry = require('./sentry').sentry;
 var states = exports.states = {
     STATE_CMD:             1,
     STATE_LOOP:            2,
@@ -51,6 +51,9 @@ for (var key in logger) {
             var args = [ this ];
             for (var i=0, l=arguments.length; i<l; i++) {
                 args.push(arguments[i]);
+            }
+            if(level === "logerror"){
+                sentry.captureException(args[args.length-1]);
             }
             logger[level].apply(logger, args);
         };

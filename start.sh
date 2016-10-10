@@ -5,9 +5,11 @@ for f in /usr/local/haraka/config/*.ini; do
   sed -i -e "s/{{MYSQL_USERNAME}}/$MYSQL_USERNAME/g" \
          -e "s/{{MYSQL_HOST}}/$MYSQL_HOST/g" \
          -e "s/{{MYSQL_PORT}}/$MYSQL_PORT/g" \
-         -e "s/{{MYSQL_DATABASE}}/$MYSQL_DATABASE/g" \
+         -e "s/{{MYSQL_AUTH_DATABASE}}/$MYSQL_AUTH_DATABASE/g" \
+         -e "s/{{MYSQL_EMAIL_DATABASE}}/$MYSQL_EMAIL_DATABASE/g" \
          -e "s/{{MYSQL_PASSWORD}}/$MYSQL_PASSWORD/g" \
-         -e "s/{{MYSQL_TABLE}}/$MYSQL_TABLE/g" \
+         -e "s/{{MYSQL_AUTH_TABLE}}/$MYSQL_AUTH_TABLE/g" \
+         -e "s/{{MYSQL_EMAIL_TABLE}}/$MYSQL_EMAIL_TABLE/g" \
          -e "s/{{REJECTUNAUTHORIZED}}/$REJECTUNAUTHORIZED/g" \
          -e "s/{{RABBITMQ_EXCHANGE}}/$RABBITMQ_EXCHANGE/g" \
          -e "s/{{RABBITMQ_HOST}}/$RABBITMQ_HOST/g" \
@@ -25,5 +27,5 @@ for f in /usr/local/haraka/config/*.ini; do
          -e "s/{{RABBITMQ_ROUTING}}/$RABBITMQ_ROUTING/g" $f
 done
 
-http-server
-#node haraka.js
+# http-server
+node haraka.js

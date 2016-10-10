@@ -3,8 +3,10 @@
 
 var path = require('path');
 var yaml = require('js-yaml');
-
+var sentry = require('./sentry').sentry;
 // for "ini" type files
+
+
 var regex = exports.regex = {
     section:        /^\s*\[\s*([^\]]*?)\s*\]\s*$/,
     param:          /^\s*([\w@:\._\-\/\[\]]+)\s*(?:=\s*(.*?)\s*)?$/,
@@ -41,7 +43,9 @@ var logger = {
         console.log.apply(console, arguments);
     },
     logerror: function () {
+        // sentry.captureException(arguments);
         console.error.apply(console, arguments);
+
     },
 }
 
@@ -104,7 +108,7 @@ cfreader.watch_dir = function () {
         cfreader._watchers[cp] = fs.watch(cp, { persistent: false }, watcher);
     }
     catch (e) {
-        logger.logerror('Error watching directory ' + cp + '(' + e + ')');
+        // logger.logerror('Error watching directory ' + cp + '(' + e + ')');
     }
     return;
 };
